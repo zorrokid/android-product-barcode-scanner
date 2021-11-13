@@ -12,12 +12,17 @@ import java.util.concurrent.Executors
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import com.example.cameraxapp.databinding.ActivityMainBinding
+import com.google.mlkit.vision.barcode.Barcode
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import java.io.File
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 typealias LumaListener = (luma: Double) -> Unit
+typealias BarcodeListener = (barcode: String) -> Unit
 
 class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
@@ -103,8 +108,11 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
+                    /*it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
                         Log.d(TAG, "Average luminosity: $luma")
+                    })*/
+                    it.setAnalyzer(cameraExecutor, BarcodeImageAnalyzer { barcode ->
+                        Log.d(TAG, "Barcode: $barcode")
                     })
                 }
 
@@ -164,6 +172,78 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT).show()
                 finish()
             }
+        }
+    }
+
+    private class BarcodeImageAnalyzer(private val listener: BarcodeListener) : ImageAnalysis.Analyzer {
+
+        @androidx.camera.core.ExperimentalGetImage
+        override fun analyze(imageProxy: ImageProxy) {
+            val mediaImage = imageProxy.image
+            if (mediaImage != null) {
+                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                // Pass image to an ML Kit Vision API
+                scanBarcodes(image, imageProxy)
+            }
+            listener("1")
+            // imageProxy.close()
+        }
+
+        private fun scanBarcodes(image: InputImage, imageProxy: ImageProxy) {
+            // [START set_detector_options]
+            val options = BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    Barcode.FORMAT_EAN_13,
+                    Barcode.FORMAT_EAN_8)
+                .build()
+            // [END set_detector_options]
+
+            // [START get_detector]
+            // val scanner = BarcodeScanning.getClient()
+            // Or, to specify the formats to recognize:
+            val scanner = BarcodeScanning.getClient(options)
+            // [END get_detector]
+
+            // [START run_detector]
+            val result = scanner.process(image)
+                .addOnSuccessListener { barcodes ->
+                    // Task completed successfully
+                    // [START_EXCLUDE]
+                    // [START get_barcodes]
+                    for (barcode in barcodes) {
+                        //val bounds = barcode.boundingBox
+                        //val corners = barcode.cornerPoints
+
+                        val rawValue = barcode.rawValue
+                        listener(rawValue)
+                        // val valueType = barcode.valueType
+                        // See API reference for complete list of supported types
+                        /*when (valueType) {
+                            Barcode.TYPE_WIFI -> {
+                                val ssid = barcode.wifi!!.ssid
+                                val password = barcode.wifi!!.password
+                                val type = barcode.wifi!!.encryptionType
+                            }
+                            Barcode.TYPE_URL -> {
+                                val title = barcode.url!!.title
+                                val url = barcode.url!!.url
+                            }
+                            Barcode.TYPE_PRODUCT -> {
+                            }
+                        }*/
+                    }
+                    // [END get_barcodes]
+                    // [END_EXCLUDE]
+                }
+                .addOnFailureListener { exception ->
+                    // Task failed with an exception
+                    if (exception != null)
+                        Log.e(TAG, exception.toString())
+                }
+                .addOnCompleteListener { results ->
+                    imageProxy.close()
+                }
+            // [END run_detector
         }
     }
 
