@@ -2,6 +2,7 @@ package com.example.cameraxapp
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
@@ -17,12 +18,12 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.io.File
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
-typealias LumaListener = (luma: Double) -> Unit
 typealias BarcodeListener = (barcode: String) -> Unit
+
+const val EXTRA_BARCODE = "com.example.cameraxapp.BARCODE"
 
 class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
@@ -108,11 +109,12 @@ class MainActivity : AppCompatActivity() {
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
-                    /*it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
-                        Log.d(TAG, "Average luminosity: $luma")
-                    })*/
                     it.setAnalyzer(cameraExecutor, BarcodeImageAnalyzer { barcode ->
                         Log.d(TAG, "Barcode: $barcode")
+                        val intent = Intent(this, ShowBarcodeActivity::class.java).apply {
+                            putExtra(EXTRA_BARCODE, barcode)
+                        }
+                        startActivity(intent)
                     })
                 }
 
@@ -185,7 +187,7 @@ class MainActivity : AppCompatActivity() {
                 // Pass image to an ML Kit Vision API
                 scanBarcodes(image, imageProxy)
             }
-            listener("1")
+            //listener("1")
             // imageProxy.close()
         }
 
@@ -246,27 +248,4 @@ class MainActivity : AppCompatActivity() {
             // [END run_detector
         }
     }
-
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind()    // Rewind the buffer to zero
-            val data = ByteArray(remaining())
-            get(data)   // Copy the buffer into a byte array
-            return data // Return the byte array
-        }
-
-        override fun analyze(image: ImageProxy) {
-
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-            val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
-
-            listener(luma)
-
-            image.close()
-        }
-    }
-
 }
