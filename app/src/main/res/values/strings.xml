@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">CameraX App</string>
+    <string name="button_search_products">Search products</string>
 </resources>
